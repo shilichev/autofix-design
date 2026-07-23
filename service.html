@@ -1,0 +1,1128 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AutoFix — панель автосервиса (Максим)</title>
+<style>
+:root {
+  --bg: #f4f5f8;
+  --sidebar-bg: #1f2433;
+  --sidebar-text: #b8bdcc;
+  --sidebar-text-active: #ffffff;
+  --border: #e3e5ec;
+  --text: #1f2433;
+  --text-muted: #6b7080;
+  --primary: #4361ee;
+  --primary-dark: #3348c4;
+  --danger: #e5484d;
+
+  --status-todo: #56ccf2;
+  --status-onhold: #e0b33c;
+  --status-inprogress: #f2994a;
+  --status-done: #2f9e6e;
+  --status-reject: #eb5757;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+  color: var(--text);
+  background: var(--bg);
+}
+
+.app { display: flex; min-height: 100vh; }
+
+.sidebar {
+  width: 240px;
+  background: var(--sidebar-bg);
+  color: var(--sidebar-text);
+  display: flex;
+  flex-direction: column;
+  padding: 20px 14px;
+  flex-shrink: 0;
+}
+
+.brand { font-size: 20px; font-weight: 700; color: #fff; padding: 0 8px; }
+.brand-sub { font-size: 11px; color: #8890a6; padding: 2px 8px 20px; }
+
+.nav { display: flex; flex-direction: column; gap: 2px; }
+
+.nav-item {
+  text-align: left;
+  padding: 10px 12px;
+  border: none;
+  background: transparent;
+  color: var(--sidebar-text);
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.nav-item:hover { background: rgba(255,255,255,0.06); }
+
+.nav-item.active {
+  background: rgba(255,255,255,0.12);
+  color: var(--sidebar-text-active);
+  font-weight: 600;
+}
+
+.sidebar-footer { margin-top: auto; font-size: 11px; color: #6a7086; padding: 8px; }
+
+.content { flex: 1; padding: 28px 32px; overflow-x: auto; }
+
+.screen-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 22px;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.screen-header h1 { font-size: 22px; margin: 0; }
+.screen-header p { margin: 4px 0 0; color: var(--text-muted); font-size: 13px; }
+
+.btn { border: none; border-radius: 8px; padding: 10px 16px; font-size: 14px; font-weight: 600; cursor: pointer; }
+.btn-primary { background: var(--primary); color: #fff; }
+.btn-primary:hover { background: var(--primary-dark); }
+.btn-secondary { background: #eef0f5; color: var(--text); }
+.btn-secondary:hover { background: #e2e5ee; }
+.btn-sm { padding: 6px 10px; font-size: 12px; border-radius: 6px; }
+
+.board { display: flex; gap: 16px; align-items: flex-start; }
+
+.column {
+  background: #eceef3;
+  border-radius: 10px;
+  padding: 12px;
+  width: 240px;
+  flex-shrink: 0;
+  min-height: 120px;
+}
+
+.column.drag-over { outline: 2px dashed var(--primary); }
+
+.column-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  margin-bottom: 10px;
+  padding: 0 2px;
+}
+
+.status-dot { width: 8px; height: 8px; border-radius: 50%; }
+.status-dot.todo { background: var(--status-todo); }
+.status-dot.onhold { background: var(--status-onhold); }
+.status-dot.inprogress { background: var(--status-inprogress); }
+.status-dot.done { background: var(--status-done); }
+.status-dot.reject { background: var(--status-reject); }
+
+.count-badge {
+  margin-left: auto;
+  background: #dfe2ea;
+  color: var(--text-muted);
+  border-radius: 10px;
+  padding: 1px 8px;
+  font-size: 11px;
+}
+
+.card {
+  background: #fff;
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin-bottom: 8px;
+  box-shadow: 0 1px 2px rgba(20,20,40,0.06);
+  cursor: grab;
+  border-left: 3px solid transparent;
+}
+
+.card:hover { box-shadow: 0 3px 8px rgba(20,20,40,0.12); }
+.card.todo { border-left-color: var(--status-todo); }
+.card.onhold { border-left-color: var(--status-onhold); }
+.card.inprogress { border-left-color: var(--status-inprogress); }
+.card.done { border-left-color: var(--status-done); }
+.card.reject { border-left-color: var(--status-reject); }
+
+.card-id { font-size: 11px; color: var(--text-muted); margin-bottom: 4px; }
+.card-title { font-size: 13px; font-weight: 600; margin-bottom: 4px; }
+.card-sub { font-size: 12px; color: var(--text-muted); }
+.card-assignee { font-size: 11px; color: var(--primary); font-weight: 600; margin-top: 6px; }
+.card-footer { display: flex; justify-content: space-between; margin-top: 8px; font-size: 11px; color: var(--text-muted); }
+
+.priority-tag { display: inline-block; font-size: 10px; padding: 1px 6px; border-radius: 6px; font-weight: 600; }
+.priority-high { background: #fde3e3; color: var(--danger); }
+.priority-normal { background: #e6eefc; color: var(--primary); }
+
+.table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 10px; overflow: hidden; }
+.table th, .table td { text-align: left; padding: 12px 14px; border-bottom: 1px solid var(--border); font-size: 13px; }
+.table th { background: #f7f8fb; color: var(--text-muted); font-weight: 600; font-size: 12px; }
+.table tr:last-child td { border-bottom: none; }
+
+.form-grid { display: grid; grid-template-columns: 1.2fr 1fr; gap: 20px; align-items: start; }
+.panel { background: #fff; border-radius: 10px; padding: 20px; border: 1px solid var(--border); }
+.panel h3 { margin: 0 0 14px; font-size: 15px; }
+.field { margin-bottom: 14px; }
+.field label { display: block; font-size: 12px; color: var(--text-muted); margin-bottom: 6px; font-weight: 600; }
+.field input, .field textarea, .field select {
+  width: 100%;
+  padding: 9px 10px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  font-size: 13px;
+  font-family: inherit;
+}
+.field-row { display: flex; gap: 12px; }
+.field-row .field { flex: 1; }
+
+.form-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
+
+.switch-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid var(--border); }
+.switch-row:last-child { border-bottom: none; }
+.switch-label { font-size: 13px; }
+.switch-desc { font-size: 11px; color: var(--text-muted); }
+
+.switch { position: relative; width: 38px; height: 22px; flex-shrink: 0; }
+.switch input { opacity: 0; width: 0; height: 0; }
+.slider { position: absolute; cursor: pointer; inset: 0; background: #cfd3de; border-radius: 22px; transition: 0.15s; }
+.slider::before {
+  content: "";
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  left: 3px;
+  top: 3px;
+  background: #fff;
+  border-radius: 50%;
+  transition: 0.15s;
+}
+.switch input:checked + .slider { background: var(--primary); }
+.switch input:checked + .slider::before { transform: translateX(16px); }
+
+.notif-item { display: flex; gap: 12px; background: #fff; border: 1px solid var(--border); border-radius: 10px; padding: 14px; margin-bottom: 10px; align-items: flex-start; }
+.notif-item.unread { border-left: 3px solid var(--primary); }
+.notif-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: #eef1ff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-size: 14px;
+}
+.notif-title { font-size: 13px; font-weight: 600; }
+.notif-text { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+.notif-time { font-size: 11px; color: var(--text-muted); margin-left: auto; white-space: nowrap; }
+
+.calendar-toolbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.calendar-month-label { font-size: 15px; font-weight: 700; }
+
+.calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; margin-bottom: 8px; }
+.calendar-weekdays div { text-align: center; font-size: 11px; font-weight: 600; color: var(--text-muted); }
+
+.calendar-cell {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  min-height: 88px;
+  padding: 6px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.calendar-cell .day-num { font-weight: 600; color: var(--text); }
+.calendar-cell.empty { background: transparent; border-color: transparent; }
+
+.calendar-cell.clickable { cursor: pointer; }
+.calendar-cell.clickable:hover { box-shadow: 0 3px 8px rgba(20,20,40,0.12); }
+
+.calendar-cell.load-low { background: #eef6fc; border-color: #cfe6f5; }
+.calendar-cell.load-medium { background: #fff4e0; border-color: #f2dba8; }
+.calendar-cell.load-high { background: #fde3e3; border-color: #f3c8c9; }
+
+.day-num-row { display: flex; align-items: center; justify-content: space-between; }
+
+.day-count-badge {
+  background: var(--primary);
+  color: #fff;
+  border-radius: 10px;
+  padding: 0 6px;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.calendar-chip {
+  margin-top: 4px;
+  background: #eef1ff;
+  color: var(--primary);
+  border-radius: 5px;
+  padding: 2px 5px;
+  font-size: 10px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.calendar-more { margin-top: 2px; font-size: 10px; color: var(--text-muted); }
+
+.table select, .table input[type="date"], .table input[type="text"] {
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 12px;
+  font-family: inherit;
+}
+
+.filters-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px 16px;
+  margin-bottom: 16px;
+}
+
+.filter-field { display: flex; flex-direction: column; gap: 4px; min-width: 130px; }
+.filter-field label { font-size: 11px; color: var(--text-muted); font-weight: 600; }
+
+.filter-input {
+  padding: 7px 9px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 12px;
+  font-family: inherit;
+}
+
+.comment-list { max-height: 140px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; margin-bottom: 8px; }
+.comment-item { background: #f7f8fb; border-radius: 8px; padding: 8px 10px; font-size: 12px; }
+.comment-meta { font-size: 11px; color: var(--text-muted); margin-bottom: 2px; }
+.comment-empty { font-size: 12px; color: var(--text-muted); margin-bottom: 8px; }
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15,17,26,0.45);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+}
+.modal-overlay.open { display: flex; }
+.modal { background: #fff; border-radius: 12px; width: 460px; max-width: 92vw; max-height: 86vh; overflow-y: auto; padding: 22px; }
+.modal-close { float: right; border: none; background: transparent; font-size: 18px; cursor: pointer; color: var(--text-muted); }
+
+.toast {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%) translateY(20px);
+  background: #1f2433;
+  color: #fff;
+  padding: 12px 20px;
+  border-radius: 8px;
+  font-size: 13px;
+  opacity: 0;
+  pointer-events: none;
+  transition: 0.2s;
+  z-index: 100;
+}
+.toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+.empty-state { text-align: center; padding: 60px 20px; color: var(--text-muted); font-size: 13px; }
+
+.storage-list { display: flex; flex-direction: column; gap: 10px; margin-top: 10px; }
+.storage-item { display: flex; justify-content: space-between; align-items: center; background: #f7f8fb; border-radius: 8px; padding: 10px 12px; font-size: 12px; }
+.storage-item strong { display: block; font-size: 13px; }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand">🔧 AutoFix</div>
+    <div class="brand-sub">Автосервис · панель мастера (Максим)</div>
+
+    <nav class="nav" id="nav-service">
+      <button class="nav-item active" data-screen="board">📋 Главная</button>
+      <button class="nav-item" data-screen="history">🕓 История</button>
+      <button class="nav-item" data-screen="calendar">📅 Календарь</button>
+      <button class="nav-item" data-screen="notifications">🔔 Уведомления</button>
+      <button class="nav-item" data-screen="profile">👤 Личный кабинет</button>
+    </nav>
+
+    <div class="sidebar-footer">Мокап интерфейса · не финальный дизайн</div>
+  </aside>
+
+  <main class="content" id="content"></main>
+</div>
+
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal" id="modal"></div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ---------------- Mock data ---------------- */
+
+const STATUS_META = {
+  todo:       { label: 'To Do',        dot: 'todo' },
+  onhold:     { label: 'On Hold',      dot: 'onhold' },
+  inprogress: { label: 'In Progress',  dot: 'inprogress' },
+  done:       { label: 'Done',         dot: 'done' },
+  reject:     { label: 'Reject',       dot: 'reject' },
+};
+
+const MECHANICS = ['Иванов Пётр', 'Сидоров Олег', 'Смирнова Дарья', 'Кузнецов Игорь'];
+
+const requests = [
+  {
+    id: 'REQ-1001', client: 'Иванов Иван Иванович', phone: '+7 900 123-45-67',
+    car: 'Toyota Camry', plate: 'А123БВ 777', vin: 'JTNBE46K003123456',
+    issue: 'Замена переднего бампера после ДТП', priority: 'high',
+    status: 'inprogress', created: '2026-06-28',
+    storage: { location: 'Бокс 4', from: '2026-06-28', to: '2026-07-10' },
+    assignee: 'Иванов Пётр', dueDate: '2026-07-10',
+    comments: [{ author: 'Иванов Пётр', text: 'Деталь на складе, начинаю с бампера завтра утром.', time: '2026-07-04 09:10' }],
+  },
+  {
+    id: 'REQ-1002', client: 'Петрова Анна Сергеевна', phone: '+7 903 555-11-22',
+    car: 'Kia Rio', plate: 'В456ГД 777', vin: 'XWKJ56K102998877',
+    issue: 'Стук в подвеске, требуется диагностика', priority: 'normal',
+    status: 'onhold', created: '2026-06-30',
+    storage: { location: 'Бокс 1', from: '2026-06-30', to: '2026-07-05' },
+    assignee: '', dueDate: '2026-07-10',
+    comments: [],
+  },
+  {
+    id: 'REQ-1003', client: 'Сидоров Пётр Николаевич', phone: '+7 916 222-33-44',
+    car: 'Hyundai Solaris', plate: 'Е789ЖЗ 199', vin: 'Z94CB41ABGR112233',
+    issue: 'Не работает кондиционер', priority: 'normal',
+    status: 'todo', created: '2026-07-02',
+    storage: null,
+    assignee: '', dueDate: '',
+    comments: [],
+  },
+  {
+    id: 'REQ-1004', client: 'Кузнецова Мария Олеговна', phone: '+7 925 777-88-99',
+    car: 'Skoda Octavia', plate: 'К321ЛМ 777', vin: 'TMBEF7NE9M0112244',
+    issue: 'Плановое ТО, замена масла и фильтров', priority: 'normal',
+    status: 'done', created: '2026-06-20',
+    storage: null,
+    assignee: 'Кузнецов Игорь', dueDate: '2026-06-20',
+    comments: [],
+  },
+  {
+    id: 'REQ-1005', client: 'Фёдоров Артём Викторович', phone: '+7 917 444-22-11',
+    car: 'BMW X5', plate: 'Р111НО 777', vin: 'WBAFR9C50DD112255',
+    issue: 'Клиент отменил визит', priority: 'normal',
+    status: 'reject', created: '2026-06-25',
+    storage: null,
+    assignee: '', dueDate: '',
+    comments: [],
+  },
+  {
+    id: 'REQ-1006', client: 'Морозов Данила Юрьевич', phone: '+7 911 333-22-11',
+    car: 'Audi A6', plate: 'Т555КХ 777', vin: 'WAUZZZ4G8JN123456',
+    issue: 'Диагностика двигателя, посторонний шум', priority: 'normal',
+    status: 'todo', created: '2026-07-03',
+    storage: { location: 'Бокс 2', from: '2026-07-03', to: '2026-07-12' },
+    assignee: '', dueDate: '2026-07-10',
+    comments: [],
+  },
+  {
+    id: 'REQ-1007', client: 'Никитина Елена Валерьевна', phone: '+7 903 888-77-66',
+    car: 'Renault Duster', plate: 'М777ОР 777', vin: 'X7LDSRHZH7H123456',
+    issue: 'Замена тормозных колодок', priority: 'normal',
+    status: 'inprogress', created: '2026-07-04',
+    storage: { location: 'Бокс 3', from: '2026-07-04', to: '2026-07-16' },
+    assignee: 'Смирнова Дарья', dueDate: '2026-07-15',
+    comments: [],
+  },
+  {
+    id: 'REQ-1008', client: 'Волков Егор Станиславович', phone: '+7 925 222-11-00',
+    car: 'Mazda 6', plate: 'С999АВ 777', vin: 'JM1GJ1V56E1123456',
+    issue: 'Плановое ТО перед поездкой', priority: 'high',
+    status: 'todo', created: '2026-07-04',
+    storage: null,
+    assignee: '', dueDate: '2026-07-15',
+    comments: [],
+  },
+];
+
+const carStorage = [
+  { car: 'Toyota Camry', plate: 'А123БВ 777', vin: 'JTNBE46K003123456', location: 'Бокс 4', from: '2026-06-28', to: '2026-07-10' },
+  { car: 'Kia Rio', plate: 'В456ГД 777', vin: 'XWKJ56K102998877', location: 'Бокс 1', from: '2026-06-30', to: '2026-07-05' },
+];
+
+const notifications = [
+  { icon: '📥', title: 'Новая заявка REQ-1003', text: 'Поступила от оператора Василия', time: '1 ч назад', unread: true },
+  { icon: '🚗', title: 'Автомобиль принят на хранение', text: 'Toyota Camry, Бокс 4', time: 'сегодня', unread: true },
+  { icon: '📅', title: 'Напоминание', text: 'REQ-1002: назначить дату доставки детали', time: 'вчера', unread: false },
+];
+
+const notificationChannels = [
+  { key: 'messenger', label: 'Любой мессенджер', desc: 'Telegram, WhatsApp и т.д.', on: true },
+  { key: 'sms', label: 'SMS', desc: 'Короткие текстовые уведомления', on: true },
+  { key: 'email', label: 'Рабочая почта', desc: 'Дублирование уведомлений на email', on: false },
+  { key: 'inapp', label: 'Уведомление в интерфейсе', desc: 'С возможностью сквозного push', on: true },
+];
+
+/* ---------------- State ---------------- */
+
+const state = {
+  screen: 'board', calendarYear: 2026, calendarMonth: 6, selectedDate: null,
+  historyFilters: { id: '', client: '', car: '', plate: '', issue: '', status: '', date: '' },
+};
+
+/* ---------------- Helpers ---------------- */
+
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str == null ? '' : str;
+  return div.innerHTML;
+}
+
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(toast._t);
+  toast._t = setTimeout(() => el.classList.remove('show'), 2200);
+}
+
+function findRequest(id) {
+  return requests.find(r => r.id === id);
+}
+
+function cardHtml(r) {
+  return `
+    <div class="card ${r.status}" draggable="true" data-id="${r.id}">
+      <div class="card-id">${r.id}</div>
+      <div class="card-title">${escapeHtml(r.car)}</div>
+      <div class="card-sub">${escapeHtml(r.issue)}</div>
+      ${r.assignee ? `<div class="card-assignee">🔧 ${escapeHtml(r.assignee)} · до ${r.dueDate}</div>` : ''}
+      <div class="card-footer">
+        <span class="priority-tag ${r.priority === 'high' ? 'priority-high' : 'priority-normal'}">
+          ${r.priority === 'high' ? 'Срочно' : 'Обычный'}
+        </span>
+        <span>${r.created}</span>
+      </div>
+    </div>`;
+}
+
+function columnHtml(statusKey, items) {
+  const meta = STATUS_META[statusKey];
+  return `
+    <div class="column" data-status="${statusKey}">
+      <div class="column-header">
+        <span class="status-dot ${meta.dot}"></span>
+        <span>${meta.label}</span>
+        <span class="count-badge">${items.length}</span>
+      </div>
+      <div class="column-body">
+        ${items.length ? items.map(cardHtml).join('') : ''}
+      </div>
+    </div>`;
+}
+
+function boardHtml(statusOrder) {
+  const cols = statusOrder.map(s => columnHtml(s, requests.filter(r => r.status === s)));
+  return `<div class="board">${cols.join('')}</div>`;
+}
+
+/* ---------------- Screens ---------------- */
+
+function screenBoard() {
+  return `
+    <div class="screen-header">
+      <div>
+        <h1>Главная</h1>
+        <p>Полный цикл заявок — от постановки в очередь до завершения работ</p>
+      </div>
+    </div>
+    ${boardHtml(['todo', 'onhold', 'inprogress', 'done', 'reject'])}
+  `;
+}
+
+function screenHistory() {
+  const f = state.historyFilters;
+  const items = requests.filter(r => r.status === 'done' || r.status === 'reject');
+  return `
+    <div class="screen-header">
+      <div>
+        <h1>История</h1>
+        <p>Завершённые и отклонённые заявки</p>
+      </div>
+    </div>
+    <div class="filters-bar" id="history-table">
+      <div class="filter-field">
+        <label>ID</label>
+        <input class="filter-input" id="filter-id" placeholder="Фильтр" value="${escapeHtml(f.id)}">
+      </div>
+      <div class="filter-field">
+        <label>Клиент</label>
+        <input class="filter-input" id="filter-client" placeholder="Фильтр" value="${escapeHtml(f.client)}">
+      </div>
+      <div class="filter-field">
+        <label>Автомобиль</label>
+        <input class="filter-input" id="filter-car" placeholder="Фильтр" value="${escapeHtml(f.car)}">
+      </div>
+      <div class="filter-field">
+        <label>Гос. номер</label>
+        <input class="filter-input" id="filter-plate" placeholder="Гос. номер" value="${escapeHtml(f.plate)}">
+      </div>
+      <div class="filter-field">
+        <label>Суть</label>
+        <input class="filter-input" id="filter-issue" placeholder="Фильтр" value="${escapeHtml(f.issue)}">
+      </div>
+      <div class="filter-field">
+        <label>Статус</label>
+        <select class="filter-input" id="filter-status">
+          <option value="">Все</option>
+          <option value="done" ${f.status === 'done' ? 'selected' : ''}>Done</option>
+          <option value="reject" ${f.status === 'reject' ? 'selected' : ''}>Reject</option>
+        </select>
+      </div>
+      <div class="filter-field">
+        <label>Дата</label>
+        <input class="filter-input" id="filter-date" placeholder="ГГГГ-ММ-ДД" value="${escapeHtml(f.date)}">
+      </div>
+      <button class="btn btn-secondary btn-sm" data-action="reset-history-filters">Сбросить фильтры</button>
+    </div>
+    <table class="table">
+      <thead>
+        <tr>
+          <th>ID</th><th>Клиент</th><th>Автомобиль</th><th>Гос. номер</th><th>Суть</th><th>Статус</th><th>Дата</th>
+        </tr>
+      </thead>
+      <tbody id="history-tbody">
+        ${items.map(r => `
+          <tr data-id="${r.id.toLowerCase()}" data-client="${escapeHtml(r.client).toLowerCase()}" data-car="${escapeHtml(r.car).toLowerCase()}" data-plate="${escapeHtml(r.plate || '').toLowerCase()}" data-issue="${escapeHtml(r.issue).toLowerCase()}" data-status="${r.status}" data-date="${r.created}">
+            <td>${r.id}</td>
+            <td>${escapeHtml(r.client)}</td>
+            <td>${escapeHtml(r.car)}</td>
+            <td>${r.plate ? escapeHtml(r.plate) : '—'}</td>
+            <td>${escapeHtml(r.issue)}</td>
+            <td><span class="status-dot ${STATUS_META[r.status].dot}"></span> ${STATUS_META[r.status].label}</td>
+            <td>${r.created}</td>
+          </tr>`).join('')}
+      </tbody>
+    </table>
+    <div class="empty-state" id="history-empty" style="display:none">Совпадений по фильтрам не найдено</div>
+  `;
+}
+
+const MONTH_NAMES = ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'];
+
+function pad2(n) { return String(n).padStart(2, '0'); }
+
+function requestsOnDate(dateStr) {
+  return requests.filter(r => r.dueDate === dateStr);
+}
+
+function loadClassFor(count) {
+  if (count >= 5) return 'load-high';
+  if (count >= 3) return 'load-medium';
+  if (count >= 1) return 'load-low';
+  return '';
+}
+
+function screenCalendar() {
+  const year = state.calendarYear;
+  const month = state.calendarMonth;
+  const firstWeekday = (new Date(year, month, 1).getDay() + 6) % 7; // Monday-first
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+  let cells = '';
+  for (let i = 0; i < firstWeekday; i++) cells += `<div class="calendar-cell empty"></div>`;
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dateStr = `${year}-${pad2(month + 1)}-${pad2(d)}`;
+    const items = requestsOnDate(dateStr);
+    const count = items.length;
+    const chips = items.slice(0, 2).map(r => `<div class="calendar-chip">${escapeHtml(r.car)}</div>`).join('');
+    const more = count > 2 ? `<div class="calendar-more">+${count - 2} ещё</div>` : '';
+    cells += `
+      <div class="calendar-cell ${loadClassFor(count)} ${count ? 'clickable' : ''}" ${count ? `data-action="open-day" data-date="${dateStr}"` : ''}>
+        <div class="day-num-row">
+          <span class="day-num">${d}</span>
+          ${count ? `<span class="day-count-badge">${count}</span>` : ''}
+        </div>
+        ${chips}${more}
+      </div>`;
+  }
+
+  return `
+    <div class="screen-header">
+      <div>
+        <h1>Календарь</h1>
+        <p>Запланированные даты выполнения работ. Нажмите на день, чтобы посмотреть и переназначить заявки.</p>
+      </div>
+    </div>
+    <div class="calendar-toolbar">
+      <button class="btn btn-secondary btn-sm" data-action="prev-month">← Пред. месяц</button>
+      <div class="calendar-month-label">${MONTH_NAMES[month]} ${year}</div>
+      <button class="btn btn-secondary btn-sm" data-action="next-month">След. месяц →</button>
+    </div>
+    <div class="calendar-grid calendar-weekdays">
+      <div>Пн</div><div>Вт</div><div>Ср</div><div>Чт</div><div>Пт</div><div>Сб</div><div>Вс</div>
+    </div>
+    <div class="calendar-grid">${cells}</div>
+  `;
+}
+
+function screenDay(dateStr) {
+  const items = requestsOnDate(dateStr);
+  const [y, m, d] = dateStr.split('-');
+  return `
+    <div class="screen-header">
+      <div>
+        <h1>Заявки на ${d}.${m}.${y}</h1>
+        <p>${items.length ? `Запланировано заявок: ${items.length}` : 'На этот день заявок не запланировано'}</p>
+      </div>
+      <button class="btn btn-secondary" data-action="back-to-calendar">← К календарю</button>
+    </div>
+    ${items.length ? `
+    <table class="table">
+      <thead>
+        <tr>
+          <th>ID</th><th>Клиент</th><th>Автомобиль</th><th>Суть</th><th>Приоритет</th>
+          <th>Статус</th><th>Бокс</th><th>Мастер</th><th>Дата выполнения</th><th>Комментарии</th><th></th>
+        </tr>
+      </thead>
+      <tbody>
+        ${items.map(r => `
+          <tr>
+            <td>${r.id}</td>
+            <td>${escapeHtml(r.client)}</td>
+            <td>${escapeHtml(r.car)} · ${escapeHtml(r.plate)}</td>
+            <td>${escapeHtml(r.issue)}</td>
+            <td><span class="priority-tag ${r.priority === 'high' ? 'priority-high' : 'priority-normal'}">${r.priority === 'high' ? 'Срочно' : 'Обычный'}</span></td>
+            <td><span class="status-dot ${STATUS_META[r.status].dot}"></span> ${STATUS_META[r.status].label}</td>
+            <td>${r.storage ? escapeHtml(r.storage.location) : '—'}</td>
+            <td>${r.assignee ? escapeHtml(r.assignee) : '—'}</td>
+            <td>${r.dueDate || '—'}</td>
+            <td>${(r.comments && r.comments.length) ? `💬 ${r.comments.length}` : '—'}</td>
+            <td><button class="btn btn-secondary btn-sm" data-action="edit-day-row" data-id="${r.id}">Изменить</button></td>
+          </tr>`).join('')}
+      </tbody>
+    </table>` : `<div class="empty-state">Нет заявок с датой выполнения на этот день</div>`}
+  `;
+}
+
+function screenNotifications() {
+  return `
+    <div class="screen-header">
+      <div>
+        <h1>Уведомления</h1>
+        <p>Последние события по заявкам</p>
+      </div>
+      <button class="btn btn-secondary" data-action="mark-read">Отметить всё как прочитанное</button>
+    </div>
+    ${notifications.map(n => `
+      <div class="notif-item ${n.unread ? 'unread' : ''}">
+        <div class="notif-icon">${n.icon}</div>
+        <div>
+          <div class="notif-title">${escapeHtml(n.title)}</div>
+          <div class="notif-text">${escapeHtml(n.text)}</div>
+        </div>
+        <div class="notif-time">${n.time}</div>
+      </div>`).join('')}
+  `;
+}
+
+function screenProfile() {
+  return `
+    <div class="screen-header">
+      <div>
+        <h1>Личный кабинет</h1>
+        <p>Максим (автосервис)</p>
+      </div>
+    </div>
+    <div class="form-grid">
+      <div class="panel">
+        <h3>Данные аккаунта</h3>
+        <div class="field-row">
+          <div class="field"><label>Email</label><input type="email" value="maxim@autofix.example" /></div>
+          <div class="field"><label>Пароль</label><input type="password" value="••••••••" /></div>
+        </div>
+        <div class="field"><label>Телефон</label><input type="tel" value="+7 900 000-00-00" /></div>
+
+        <h3 style="margin-top:20px">Каналы уведомлений</h3>
+        ${notificationChannels.map(c => `
+          <div class="switch-row">
+            <div>
+              <div class="switch-label">${c.label}</div>
+              <div class="switch-desc">${c.desc}</div>
+            </div>
+            <label class="switch">
+              <input type="checkbox" ${c.on ? 'checked' : ''} data-action="toggle-channel" data-key="${c.key}">
+              <span class="slider"></span>
+            </label>
+          </div>`).join('')}
+      </div>
+
+      <div class="panel">
+        <h3>Car Storage</h3>
+        <p style="font-size:12px;color:var(--text-muted);margin-top:-8px">Автомобили, находящиеся на хранении</p>
+        <div class="storage-list">
+          ${carStorage.map(c => `
+            <div class="storage-item">
+              <div>
+                <strong>${escapeHtml(c.car)} · ${escapeHtml(c.plate)}</strong>
+                VIN: ${escapeHtml(c.vin)}
+              </div>
+              <div style="text-align:right">
+                ${escapeHtml(c.location)}<br>${c.from} — ${c.to}
+              </div>
+            </div>`).join('')}
+        </div>
+        <button class="btn btn-secondary btn-sm" style="margin-top:12px" data-action="add-storage">+ Добавить авто</button>
+      </div>
+    </div>
+  `;
+}
+
+/* ---------------- Render dispatcher ---------------- */
+
+function render() {
+  const content = document.getElementById('content');
+  let html = '';
+
+  switch (state.screen) {
+    case 'board': html = screenBoard(); break;
+    case 'history': html = screenHistory(); break;
+    case 'calendar': html = screenCalendar(); break;
+    case 'day': html = screenDay(state.selectedDate); break;
+    case 'notifications': html = screenNotifications(); break;
+    case 'profile': html = screenProfile(); break;
+  }
+
+  content.innerHTML = html;
+  wireDragAndDrop();
+  wireHistoryFilters();
+
+  document.querySelectorAll('.nav-item').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.screen === state.screen);
+  });
+}
+
+/* ---------------- History filters ---------------- */
+
+function wireHistoryFilters() {
+  const bar = document.getElementById('history-table');
+  if (!bar) return;
+  bar.querySelectorAll('.filter-input').forEach(inp => {
+    inp.addEventListener('input', applyHistoryFilters);
+    inp.addEventListener('change', applyHistoryFilters);
+  });
+  applyHistoryFilters();
+}
+
+function applyHistoryFilters() {
+  const f = {
+    id: document.getElementById('filter-id').value.trim().toLowerCase(),
+    client: document.getElementById('filter-client').value.trim().toLowerCase(),
+    car: document.getElementById('filter-car').value.trim().toLowerCase(),
+    plate: document.getElementById('filter-plate').value.trim().toLowerCase(),
+    issue: document.getElementById('filter-issue').value.trim().toLowerCase(),
+    status: document.getElementById('filter-status').value,
+    date: document.getElementById('filter-date').value.trim(),
+  };
+  state.historyFilters = f;
+
+  let visibleCount = 0;
+  document.querySelectorAll('#history-tbody tr').forEach(row => {
+    const matches =
+      (!f.id || row.dataset.id.includes(f.id)) &&
+      (!f.client || row.dataset.client.includes(f.client)) &&
+      (!f.car || row.dataset.car.includes(f.car)) &&
+      (!f.plate || row.dataset.plate.includes(f.plate)) &&
+      (!f.issue || row.dataset.issue.includes(f.issue)) &&
+      (!f.status || row.dataset.status === f.status) &&
+      (!f.date || row.dataset.date.includes(f.date));
+    row.style.display = matches ? '' : 'none';
+    if (matches) visibleCount++;
+  });
+  document.getElementById('history-empty').style.display = visibleCount ? 'none' : '';
+}
+
+/* ---------------- Drag & drop ---------------- */
+
+let draggedId = null;
+
+function wireDragAndDrop() {
+  document.querySelectorAll('.card').forEach(card => {
+    card.addEventListener('dragstart', () => { draggedId = card.dataset.id; });
+    card.addEventListener('click', () => openCardModal(card.dataset.id));
+  });
+
+  document.querySelectorAll('.column').forEach(col => {
+    col.addEventListener('dragover', e => {
+      e.preventDefault();
+      col.classList.add('drag-over');
+    });
+    col.addEventListener('dragleave', () => col.classList.remove('drag-over'));
+    col.addEventListener('drop', () => {
+      col.classList.remove('drag-over');
+      const req = findRequest(draggedId);
+      if (!req) return;
+      const targetStatus = col.dataset.status;
+      if (targetStatus === 'inprogress' && req.status !== 'inprogress') {
+        openAssignModal(req.id);
+        return;
+      }
+      req.status = targetStatus;
+      toast(`${req.id} перемещена в «${STATUS_META[req.status].label}»`);
+      render();
+    });
+  });
+}
+
+/* ---------------- Modal ---------------- */
+
+function openCardModal(id) {
+  const r = findRequest(id);
+  if (!r) return;
+  const overlay = document.getElementById('modalOverlay');
+  const modal = document.getElementById('modal');
+  modal.innerHTML = `
+    <button class="modal-close" data-action="close-modal">✕</button>
+    <h3 style="margin-top:0">${r.id}</h3>
+    <div class="field"><label>Клиент</label><input value="${escapeHtml(r.client)}" disabled></div>
+    <div class="field-row">
+      <div class="field"><label>Телефон</label><input value="${escapeHtml(r.phone)}" disabled></div>
+      <div class="field"><label>Автомобиль</label><input value="${escapeHtml(r.car)} · ${escapeHtml(r.plate)}" disabled></div>
+    </div>
+    <div class="field"><label>Описание</label><textarea rows="3" disabled>${escapeHtml(r.issue)}</textarea></div>
+    ${r.storage ? `<div class="field"><label>Car Storage</label><input value="${escapeHtml(r.storage.location)} · ${r.storage.from} — ${r.storage.to}" disabled></div>` : ''}
+    <div class="field-row">
+      <div class="field"><label>Кто выполняет</label><input id="modal-executor" placeholder="Имя мастера" value="${escapeHtml(r.assignee || '')}"></div>
+      <div class="field"><label>Дата выполнения</label><input id="modal-duedate" type="date" value="${r.dueDate || ''}"></div>
+    </div>
+    <div class="field">
+      <label>Статус</label>
+      <select id="modal-status">
+        ${Object.keys(STATUS_META).map(s => `<option value="${s}" ${s === r.status ? 'selected' : ''}>${STATUS_META[s].label}</option>`).join('')}
+      </select>
+    </div>
+    <div class="field"><label>Комментарий</label><textarea rows="2" placeholder="Внутренний комментарий..."></textarea></div>
+    <div class="form-actions">
+      <button class="btn btn-secondary" data-action="close-modal">Отмена</button>
+      <button class="btn btn-primary" data-action="save-status" data-id="${r.id}">Сохранить</button>
+    </div>
+  `;
+  overlay.classList.add('open');
+}
+
+function openAssignModal(id) {
+  const r = findRequest(id);
+  if (!r) return;
+  const overlay = document.getElementById('modalOverlay');
+  const modal = document.getElementById('modal');
+  modal.innerHTML = `
+    <button class="modal-close" data-action="close-modal">✕</button>
+    <h3 style="margin-top:0">Взять в работу · ${r.id}</h3>
+    <p style="font-size:13px;color:var(--text-muted);margin-top:-6px">${escapeHtml(r.car)} — ${escapeHtml(r.issue)}</p>
+    <div class="field">
+      <label>Кто выполняет *</label>
+      <input id="assign-executor" placeholder="Имя мастера" value="${escapeHtml(r.assignee || '')}" required>
+    </div>
+    <div class="field">
+      <label>Дата выполнения *</label>
+      <input id="assign-date" type="date" value="${r.dueDate || ''}" required>
+    </div>
+    <div class="form-actions">
+      <button class="btn btn-secondary" data-action="close-modal">Отмена</button>
+      <button class="btn btn-primary" data-action="confirm-assign" data-id="${r.id}">Взять в работу</button>
+    </div>
+  `;
+  overlay.classList.add('open');
+}
+
+function openDayEditModal(id) {
+  const r = findRequest(id);
+  if (!r) return;
+  const overlay = document.getElementById('modalOverlay');
+  const modal = document.getElementById('modal');
+  const comments = r.comments || [];
+  modal.innerHTML = `
+    <button class="modal-close" data-action="close-modal">✕</button>
+    <h3 style="margin-top:0">Изменить · ${r.id}</h3>
+    <p style="font-size:13px;color:var(--text-muted);margin-top:-6px">${escapeHtml(r.car)} — ${escapeHtml(r.issue)}</p>
+    <div class="field-row">
+      <div class="field">
+        <label>Мастер</label>
+        <select id="day-edit-mechanic">
+          <option value="">— не назначен —</option>
+          ${MECHANICS.map(mech => `<option value="${mech}" ${mech === r.assignee ? 'selected' : ''}>${mech}</option>`).join('')}
+          ${r.assignee && !MECHANICS.includes(r.assignee) ? `<option value="${escapeHtml(r.assignee)}" selected>${escapeHtml(r.assignee)}</option>` : ''}
+        </select>
+      </div>
+      <div class="field">
+        <label>Дата выполнения</label>
+        <input id="day-edit-date" type="date" value="${r.dueDate || ''}">
+      </div>
+    </div>
+    <div class="field">
+      <label>Комментарии</label>
+      ${comments.length ? `
+        <div class="comment-list">
+          ${comments.map(c => `
+            <div class="comment-item">
+              <div class="comment-meta"><strong>${escapeHtml(c.author)}</strong> · ${c.time}</div>
+              <div>${escapeHtml(c.text)}</div>
+            </div>`).join('')}
+        </div>` : `<div class="comment-empty">Пока нет комментариев</div>`}
+    </div>
+    <div class="field">
+      <label>Добавить комментарий</label>
+      <textarea id="day-edit-comment" rows="2" placeholder="Например: деталь задерживается, перенос на 2 дня..."></textarea>
+    </div>
+    <div class="form-actions">
+      <button class="btn btn-secondary" data-action="close-modal">Отмена</button>
+      <button class="btn btn-primary" data-action="save-day-edit" data-id="${r.id}">Сохранить</button>
+    </div>
+  `;
+  overlay.classList.add('open');
+}
+
+function closeModal() {
+  document.getElementById('modalOverlay').classList.remove('open');
+}
+
+/* ---------------- Event wiring ---------------- */
+
+document.querySelectorAll('.nav-item').forEach(btn => {
+  btn.addEventListener('click', () => {
+    state.screen = btn.dataset.screen;
+    render();
+  });
+});
+
+document.body.addEventListener('click', e => {
+  const action = e.target.closest('[data-action]');
+  if (!action) return;
+
+  switch (action.dataset.action) {
+    case 'mark-read':
+      notifications.forEach(n => n.unread = false);
+      toast('Все уведомления отмечены как прочитанные');
+      render();
+      break;
+
+    case 'add-storage':
+      toast('Форма добавления авто на хранение (мокап)');
+      break;
+
+    case 'reset-history-filters':
+      state.historyFilters = { id: '', client: '', car: '', plate: '', issue: '', status: '', date: '' };
+      render();
+      break;
+
+    case 'save-status': {
+      const r = findRequest(action.dataset.id);
+      const select = document.getElementById('modal-status');
+      if (!r || !select) break;
+      const newStatus = select.value;
+      const executor = document.getElementById('modal-executor').value.trim();
+      const dueDate = document.getElementById('modal-duedate').value;
+      if (newStatus === 'inprogress' && (!executor || !dueDate)) {
+        toast('Укажите, кто выполняет, и дату выполнения');
+        return;
+      }
+      r.status = newStatus;
+      if (executor) r.assignee = executor;
+      if (dueDate) r.dueDate = dueDate;
+      toast(`Статус ${r.id} изменён на «${STATUS_META[r.status].label}»`);
+      closeModal();
+      render();
+      break;
+    }
+
+    case 'confirm-assign': {
+      const r = findRequest(action.dataset.id);
+      const executor = document.getElementById('assign-executor').value.trim();
+      const date = document.getElementById('assign-date').value;
+      if (!executor || !date) {
+        toast('Укажите исполнителя и дату выполнения');
+        return;
+      }
+      r.assignee = executor;
+      r.dueDate = date;
+      r.status = 'inprogress';
+      toast(`${r.id} взята в работу: ${executor}`);
+      closeModal();
+      render();
+      break;
+    }
+
+    case 'close-modal':
+      closeModal();
+      break;
+
+    case 'prev-month':
+      state.calendarMonth--;
+      if (state.calendarMonth < 0) { state.calendarMonth = 11; state.calendarYear--; }
+      render();
+      break;
+
+    case 'next-month':
+      state.calendarMonth++;
+      if (state.calendarMonth > 11) { state.calendarMonth = 0; state.calendarYear++; }
+      render();
+      break;
+
+    case 'open-day':
+      state.selectedDate = action.dataset.date;
+      state.screen = 'day';
+      render();
+      break;
+
+    case 'back-to-calendar':
+      state.screen = 'calendar';
+      render();
+      break;
+
+    case 'edit-day-row':
+      openDayEditModal(action.dataset.id);
+      break;
+
+    case 'save-day-edit': {
+      const r = findRequest(action.dataset.id);
+      const mechanic = document.getElementById('day-edit-mechanic').value;
+      const newDate = document.getElementById('day-edit-date').value;
+      const commentText = document.getElementById('day-edit-comment').value.trim();
+      if (!mechanic || !newDate) {
+        toast('Укажите мастера и дату выполнения');
+        return;
+      }
+      r.assignee = mechanic;
+      r.dueDate = newDate;
+      if (commentText) {
+        if (!r.comments) r.comments = [];
+        r.comments.push({ author: 'Максим', text: commentText, time: 'только что' });
+      }
+      toast(`${r.id}: сохранено — ${mechanic}, ${newDate}`);
+      closeModal();
+      render();
+      break;
+    }
+  }
+});
+
+document.getElementById('modalOverlay').addEventListener('click', e => {
+  if (e.target.id === 'modalOverlay') closeModal();
+});
+
+render();
+</script>
+</body>
+</html>

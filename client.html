@@ -1,0 +1,819 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AutoFix — приём заявок (Василий)</title>
+<style>
+:root {
+  --bg: #f4f5f8;
+  --sidebar-bg: #1f2433;
+  --sidebar-text: #b8bdcc;
+  --sidebar-text-active: #ffffff;
+  --border: #e3e5ec;
+  --text: #1f2433;
+  --text-muted: #6b7080;
+  --primary: #4361ee;
+  --primary-dark: #3348c4;
+  --danger: #e5484d;
+
+  --status-todo: #56ccf2;
+  --status-onhold: #e0b33c;
+  --status-inprogress: #f2994a;
+  --status-done: #2f9e6e;
+  --status-reject: #eb5757;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+  color: var(--text);
+  background: var(--bg);
+}
+
+.app { display: flex; min-height: 100vh; }
+
+.sidebar {
+  width: 240px;
+  background: var(--sidebar-bg);
+  color: var(--sidebar-text);
+  display: flex;
+  flex-direction: column;
+  padding: 20px 14px;
+  flex-shrink: 0;
+}
+
+.brand { font-size: 20px; font-weight: 700; color: #fff; padding: 0 8px; }
+.brand-sub { font-size: 11px; color: #8890a6; padding: 2px 8px 20px; }
+
+.nav { display: flex; flex-direction: column; gap: 2px; }
+
+.nav-item {
+  text-align: left;
+  padding: 10px 12px;
+  border: none;
+  background: transparent;
+  color: var(--sidebar-text);
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.nav-item:hover { background: rgba(255,255,255,0.06); }
+
+.nav-item.active {
+  background: rgba(255,255,255,0.12);
+  color: var(--sidebar-text-active);
+  font-weight: 600;
+}
+
+.sidebar-footer { margin-top: auto; font-size: 11px; color: #6a7086; padding: 8px; }
+
+.content { flex: 1; padding: 28px 32px; overflow-x: auto; }
+
+.screen-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 22px;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.screen-header h1 { font-size: 22px; margin: 0; }
+.screen-header p { margin: 4px 0 0; color: var(--text-muted); font-size: 13px; }
+
+.btn { border: none; border-radius: 8px; padding: 10px 16px; font-size: 14px; font-weight: 600; cursor: pointer; }
+.btn-primary { background: var(--primary); color: #fff; }
+.btn-primary:hover { background: var(--primary-dark); }
+.btn-secondary { background: #eef0f5; color: var(--text); }
+.btn-secondary:hover { background: #e2e5ee; }
+.btn-danger-ghost { background: transparent; color: var(--danger); border: 1px solid #f3c8c9; }
+.btn-danger-ghost:hover { background: #fdecec; }
+.btn-sm { padding: 6px 10px; font-size: 12px; border-radius: 6px; }
+
+.status-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+.status-dot.todo { background: var(--status-todo); }
+.status-dot.onhold { background: var(--status-onhold); }
+.status-dot.inprogress { background: var(--status-inprogress); }
+.status-dot.done { background: var(--status-done); }
+.status-dot.reject { background: var(--status-reject); }
+
+.priority-tag { display: inline-block; font-size: 10px; padding: 1px 6px; border-radius: 6px; font-weight: 600; }
+.priority-high { background: #fde3e3; color: var(--danger); }
+.priority-normal { background: #e6eefc; color: var(--primary); }
+
+.table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 10px; overflow: hidden; }
+.table th, .table td { text-align: left; padding: 12px 14px; border-bottom: 1px solid var(--border); font-size: 13px; }
+.table th { background: #f7f8fb; color: var(--text-muted); font-weight: 600; font-size: 12px; }
+.table tr:last-child td { border-bottom: none; }
+
+.form-grid { display: grid; grid-template-columns: 1.2fr 1fr; gap: 20px; align-items: start; }
+.panel { background: #fff; border-radius: 10px; padding: 20px; border: 1px solid var(--border); }
+.panel h3 { margin: 0 0 14px; font-size: 15px; }
+.field { margin-bottom: 14px; }
+.field label { display: block; font-size: 12px; color: var(--text-muted); margin-bottom: 6px; font-weight: 600; }
+.field input, .field textarea, .field select {
+  width: 100%;
+  padding: 9px 10px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  font-size: 13px;
+  font-family: inherit;
+}
+.field-row { display: flex; gap: 12px; }
+.field-row .field { flex: 1; }
+
+.photo-drop {
+  border: 1.5px dashed var(--border);
+  border-radius: 8px;
+  padding: 18px;
+  text-align: center;
+  font-size: 12px;
+  color: var(--text-muted);
+  background: #fafbfd;
+}
+
+.form-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
+
+.switch-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid var(--border); }
+.switch-row:last-child { border-bottom: none; }
+.switch-label { font-size: 13px; }
+.switch-desc { font-size: 11px; color: var(--text-muted); }
+
+.switch { position: relative; width: 38px; height: 22px; flex-shrink: 0; }
+.switch input { opacity: 0; width: 0; height: 0; }
+.slider { position: absolute; cursor: pointer; inset: 0; background: #cfd3de; border-radius: 22px; transition: 0.15s; }
+.slider::before {
+  content: "";
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  left: 3px;
+  top: 3px;
+  background: #fff;
+  border-radius: 50%;
+  transition: 0.15s;
+}
+.switch input:checked + .slider { background: var(--primary); }
+.switch input:checked + .slider::before { transform: translateX(16px); }
+
+.notif-item { display: flex; gap: 12px; background: #fff; border: 1px solid var(--border); border-radius: 10px; padding: 14px; margin-bottom: 10px; align-items: flex-start; }
+.notif-item.unread { border-left: 3px solid var(--primary); }
+.notif-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: #eef1ff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-size: 14px;
+}
+.notif-title { font-size: 13px; font-weight: 600; }
+.notif-text { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+.notif-time { font-size: 11px; color: var(--text-muted); margin-left: auto; white-space: nowrap; }
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15,17,26,0.45);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+}
+.modal-overlay.open { display: flex; }
+.modal { background: #fff; border-radius: 12px; width: 460px; max-width: 92vw; max-height: 86vh; overflow-y: auto; padding: 22px; }
+.modal-close { float: right; border: none; background: transparent; font-size: 18px; cursor: pointer; color: var(--text-muted); }
+
+.toast {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%) translateY(20px);
+  background: #1f2433;
+  color: #fff;
+  padding: 12px 20px;
+  border-radius: 8px;
+  font-size: 13px;
+  opacity: 0;
+  pointer-events: none;
+  transition: 0.2s;
+  z-index: 100;
+}
+.toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+.empty-state { text-align: center; padding: 60px 20px; color: var(--text-muted); font-size: 13px; }
+
+.storage-list { display: flex; flex-direction: column; gap: 10px; margin-top: 10px; }
+.storage-item { display: flex; justify-content: space-between; align-items: center; background: #f7f8fb; border-radius: 8px; padding: 10px 12px; font-size: 12px; }
+.storage-item strong { display: block; font-size: 13px; }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand">🔧 AutoFix</div>
+    <div class="brand-sub">Приём заявок · оператор QIWI (Василий)</div>
+
+    <nav class="nav" id="nav-operator">
+      <button class="nav-item active" data-screen="requests">📋 Заявки</button>
+      <button class="nav-item" data-screen="history">🕓 История всех заявок</button>
+      <button class="nav-item" data-screen="drafts">📝 Драфты</button>
+      <button class="nav-item" data-screen="notifications">🔔 Уведомления</button>
+      <button class="nav-item" data-screen="profile">👤 Личный кабинет</button>
+    </nav>
+
+    <div class="sidebar-footer">Мокап интерфейса · не финальный дизайн</div>
+  </aside>
+
+  <main class="content" id="content"></main>
+</div>
+
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal" id="modal"></div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ---------------- Mock data ---------------- */
+
+const STATUS_META = {
+  todo:       { label: 'To Do',        dot: 'todo' },
+  onhold:     { label: 'On Hold',      dot: 'onhold' },
+  inprogress: { label: 'In Progress',  dot: 'inprogress' },
+  done:       { label: 'Done',         dot: 'done' },
+  reject:     { label: 'Reject',       dot: 'reject' },
+};
+
+let nextReqNum = 1006;
+let nextDraftNum = 1;
+
+const requests = [
+  {
+    id: 'REQ-1001', client: 'Иванов Иван Иванович', phone: '+7 900 123-45-67',
+    car: 'Toyota Camry', plate: 'А123БВ 777', vin: 'JTNBE46K003123456',
+    issue: 'Замена переднего бампера после ДТП', priority: 'high',
+    status: 'inprogress', created: '2026-06-28',
+    storage: { location: 'Бокс 4', from: '2026-06-28', to: '2026-07-10' },
+  },
+  {
+    id: 'REQ-1002', client: 'Петрова Анна Сергеевна', phone: '+7 903 555-11-22',
+    car: 'Kia Rio', plate: 'В456ГД 777', vin: 'XWKJ56K102998877',
+    issue: 'Стук в подвеске, требуется диагностика', priority: 'normal',
+    status: 'onhold', created: '2026-06-30',
+    storage: { location: 'Бокс 1', from: '2026-06-30', to: '2026-07-05' },
+  },
+  {
+    id: 'REQ-1003', client: 'Сидоров Пётр Николаевич', phone: '+7 916 222-33-44',
+    car: 'Hyundai Solaris', plate: 'Е789ЖЗ 199', vin: 'Z94CB41ABGR112233',
+    issue: 'Не работает кондиционер', priority: 'normal',
+    status: 'todo', created: '2026-07-02',
+    storage: null,
+  },
+  {
+    id: 'REQ-1004', client: 'Кузнецова Мария Олеговна', phone: '+7 925 777-88-99',
+    car: 'Skoda Octavia', plate: 'К321ЛМ 777', vin: 'TMBEF7NE9M0112244',
+    issue: 'Плановое ТО, замена масла и фильтров', priority: 'normal',
+    status: 'done', created: '2026-06-20',
+    storage: null,
+  },
+  {
+    id: 'REQ-1005', client: 'Фёдоров Артём Викторович', phone: '+7 917 444-22-11',
+    car: 'BMW X5', plate: 'Р111НО 777', vin: 'WBAFR9C50DD112255',
+    issue: 'Клиент отменил визит', priority: 'normal',
+    status: 'reject', created: '2026-06-25',
+    storage: null,
+  },
+];
+
+const drafts = [
+  {
+    id: 'DRAFT-1', client: 'Волков Сергей Игоревич', phone: '+7 902 111-22-33',
+    car: 'Volkswagen Polo', plate: 'М222РС 777', vin: '',
+    issue: 'Скрип тормозов, нужна консультация', priority: 'normal',
+  },
+];
+
+const carStorage = [
+  { car: 'Toyota Camry', plate: 'А123БВ 777', vin: 'JTNBE46K003123456', location: 'Бокс 4', from: '2026-06-28', to: '2026-07-10' },
+  { car: 'Kia Rio', plate: 'В456ГД 777', vin: 'XWKJ56K102998877', location: 'Бокс 1', from: '2026-06-30', to: '2026-07-05' },
+];
+
+const notifications = [
+  { icon: '✅', title: 'Заявка REQ-1004 завершена', text: 'Автосервис отметил задачу как выполненную', time: '2 ч назад', unread: true },
+  { icon: '📌', title: 'Заявка REQ-1002 в ожидании', text: 'Требуется уточнение у клиента по деталям', time: 'вчера', unread: true },
+  { icon: '📤', title: 'Заявка REQ-1001 отправлена', text: 'Передана в работу автосервису (Максиму)', time: '2 дня назад', unread: false },
+];
+
+const notificationChannels = [
+  { key: 'messenger', label: 'Любой мессенджер', desc: 'Telegram, WhatsApp и т.д.', on: true },
+  { key: 'sms', label: 'SMS', desc: 'Короткие текстовые уведомления', on: true },
+  { key: 'email', label: 'Рабочая почта', desc: 'Дублирование уведомлений на email', on: false },
+  { key: 'inapp', label: 'Уведомление в интерфейсе', desc: 'С возможностью сквозного push', on: true },
+];
+
+const BRANDS = [
+  'Toyota', 'Kia', 'Hyundai', 'Volkswagen', 'Skoda', 'Renault',
+  'Lada (ВАЗ)', 'Nissan', 'BMW', 'Mercedes-Benz', 'Audi', 'Mazda', 'Ford', 'Chevrolet',
+];
+
+function splitCarString(carStr) {
+  for (const b of BRANDS) {
+    if (carStr === b) return { brand: b, model: '' };
+    if (carStr.startsWith(b + ' ')) return { brand: b, model: carStr.slice(b.length + 1) };
+  }
+  return { brand: 'other', model: '', brandOther: carStr };
+}
+
+/* ---------------- State ---------------- */
+
+const state = {
+  screen: 'requests',
+  editingDraftId: null,
+};
+
+/* ---------------- Helpers ---------------- */
+
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str == null ? '' : str;
+  return div.innerHTML;
+}
+
+function carLabel(r) {
+  let label = escapeHtml(r.car);
+  if (r.year) label += ` (${escapeHtml(String(r.year))})`;
+  if (r.plate) label += ` · ${escapeHtml(r.plate)}`;
+  return label;
+}
+
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(toast._t);
+  toast._t = setTimeout(() => el.classList.remove('show'), 2200);
+}
+
+function findRequest(id) {
+  return requests.find(r => r.id === id);
+}
+
+/* ---------------- Screens ---------------- */
+
+function screenRequests() {
+  return `
+    <div class="screen-header">
+      <div>
+        <h1>Заявки</h1>
+        <p>Статус заявок в автосервисе. Менять статус может только автосервис.</p>
+      </div>
+      <button class="btn btn-primary" data-action="open-create">+ Создать заявку</button>
+    </div>
+    <table class="table">
+      <thead>
+        <tr><th>ID</th><th>Клиент</th><th>Автомобиль</th><th>Суть</th><th>Приоритет</th><th>Статус</th><th>Дата</th><th></th></tr>
+      </thead>
+      <tbody>
+        ${requests.map(r => `
+          <tr>
+            <td>${r.id}</td>
+            <td>${escapeHtml(r.client)}</td>
+            <td>${carLabel(r)}</td>
+            <td>${escapeHtml(r.issue)}</td>
+            <td><span class="priority-tag ${r.priority === 'high' ? 'priority-high' : 'priority-normal'}">${r.priority === 'high' ? 'Срочно' : 'Обычный'}</span></td>
+            <td><span class="status-dot ${STATUS_META[r.status].dot}"></span> ${STATUS_META[r.status].label}</td>
+            <td>${r.created}</td>
+            <td><button class="btn btn-secondary btn-sm" data-action="view-request" data-id="${r.id}">Просмотр</button></td>
+          </tr>`).join('')}
+      </tbody>
+    </table>
+  `;
+}
+
+function screenHistory() {
+  const items = requests.filter(r => r.status === 'done' || r.status === 'reject');
+  return `
+    <div class="screen-header">
+      <div>
+        <h1>История всех заявок</h1>
+        <p>Завершённые и отклонённые обращения</p>
+      </div>
+    </div>
+    <table class="table">
+      <thead>
+        <tr><th>ID</th><th>Клиент</th><th>Автомобиль</th><th>Суть</th><th>Статус</th><th>Дата</th></tr>
+      </thead>
+      <tbody>
+        ${items.map(r => `
+          <tr>
+            <td>${r.id}</td>
+            <td>${escapeHtml(r.client)}</td>
+            <td>${carLabel(r)}</td>
+            <td>${escapeHtml(r.issue)}</td>
+            <td><span class="status-dot ${STATUS_META[r.status].dot}"></span> ${STATUS_META[r.status].label}</td>
+            <td>${r.created}</td>
+          </tr>`).join('')}
+      </tbody>
+    </table>
+  `;
+}
+
+function screenDrafts() {
+  return `
+    <div class="screen-header">
+      <div>
+        <h1>Драфты</h1>
+        <p>Заявки, сохранённые как черновик и ещё не отправленные в автосервис</p>
+      </div>
+    </div>
+    ${drafts.length ? `
+    <table class="table">
+      <thead>
+        <tr><th>ID</th><th>Клиент</th><th>Автомобиль</th><th>Суть</th><th></th></tr>
+      </thead>
+      <tbody>
+        ${drafts.map(d => `
+          <tr>
+            <td>${d.id}</td>
+            <td>${escapeHtml(d.client)}</td>
+            <td>${escapeHtml(d.car)} · ${escapeHtml(d.plate)}</td>
+            <td>${escapeHtml(d.issue)}</td>
+            <td><button class="btn btn-secondary btn-sm" data-action="edit-draft" data-id="${d.id}">Редактировать</button></td>
+          </tr>`).join('')}
+      </tbody>
+    </table>` : `<div class="empty-state">Черновиков пока нет</div>`}
+  `;
+}
+
+function screenNotifications() {
+  return `
+    <div class="screen-header">
+      <div>
+        <h1>Уведомления</h1>
+        <p>Последние события по заявкам</p>
+      </div>
+      <button class="btn btn-secondary" data-action="mark-read">Отметить всё как прочитанное</button>
+    </div>
+    ${notifications.map(n => `
+      <div class="notif-item ${n.unread ? 'unread' : ''}">
+        <div class="notif-icon">${n.icon}</div>
+        <div>
+          <div class="notif-title">${escapeHtml(n.title)}</div>
+          <div class="notif-text">${escapeHtml(n.text)}</div>
+        </div>
+        <div class="notif-time">${n.time}</div>
+      </div>`).join('')}
+  `;
+}
+
+function screenProfile() {
+  return `
+    <div class="screen-header">
+      <div>
+        <h1>Личный кабинет</h1>
+        <p>Василий (оператор QIWI)</p>
+      </div>
+    </div>
+    <div class="form-grid">
+      <div class="panel">
+        <h3>Данные аккаунта</h3>
+        <div class="field-row">
+          <div class="field"><label>Email</label><input type="email" value="vasily@autofix.example" /></div>
+          <div class="field"><label>Пароль</label><input type="password" value="••••••••" /></div>
+        </div>
+        <div class="field"><label>Телефон</label><input type="tel" value="+7 900 000-00-00" /></div>
+
+        <h3 style="margin-top:20px">Каналы уведомлений</h3>
+        ${notificationChannels.map(c => `
+          <div class="switch-row">
+            <div>
+              <div class="switch-label">${c.label}</div>
+              <div class="switch-desc">${c.desc}</div>
+            </div>
+            <label class="switch">
+              <input type="checkbox" ${c.on ? 'checked' : ''} data-action="toggle-channel" data-key="${c.key}">
+              <span class="slider"></span>
+            </label>
+          </div>`).join('')}
+      </div>
+
+      <div class="panel">
+        <h3>Car Storage</h3>
+        <p style="font-size:12px;color:var(--text-muted);margin-top:-8px">Автомобили, находящиеся на хранении</p>
+        <div class="storage-list">
+          ${carStorage.map(c => `
+            <div class="storage-item">
+              <div>
+                <strong>${escapeHtml(c.car)} · ${escapeHtml(c.plate)}</strong>
+                VIN: ${escapeHtml(c.vin)}
+              </div>
+              <div style="text-align:right">
+                ${escapeHtml(c.location)}<br>${c.from} — ${c.to}
+              </div>
+            </div>`).join('')}
+        </div>
+        <button class="btn btn-secondary btn-sm" style="margin-top:12px" data-action="add-storage">+ Добавить авто</button>
+      </div>
+    </div>
+  `;
+}
+
+function screenCreateRequest() {
+  const editing = state.editingDraftId ? drafts.find(x => x.id === state.editingDraftId) : null;
+  const d = {
+    client: '', phone: '', issue: '', priority: 'normal',
+    brand: '', brandOther: '', model: '', year: '', plate: '', vin: '',
+    ...editing,
+  };
+  if (editing && !editing.brand) {
+    d.brand = 'other';
+    d.brandOther = editing.car || '';
+  }
+  const isOther = d.brand === 'other';
+  return `
+    <div class="screen-header">
+      <div>
+        <h1>${editing ? 'Редактирование черновика' : 'Создать заявку'}</h1>
+        <p>Заполните данные клиента и автомобиля со слов клиента</p>
+      </div>
+    </div>
+    <form id="create-form">
+      <div class="form-grid">
+        <div class="panel">
+          <h3>Клиент и проблема</h3>
+          <div class="field-row">
+            <div class="field"><label>ФИО клиента</label><input required name="client" value="${escapeHtml(d.client)}"></div>
+            <div class="field"><label>Телефон</label><input required name="phone" value="${escapeHtml(d.phone)}"></div>
+          </div>
+          <div class="field"><label>Описание проблемы</label><textarea name="issue" rows="3">${escapeHtml(d.issue)}</textarea></div>
+          <div class="field">
+            <label>Приоритет</label>
+            <select name="priority">
+              <option value="normal" ${d.priority === 'normal' ? 'selected' : ''}>Обычный</option>
+              <option value="high" ${d.priority === 'high' ? 'selected' : ''}>Срочно</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="panel">
+          <h3>Автомобиль</h3>
+          <div class="field">
+            <label>Выбрать существующий автомобиль</label>
+            <select id="storage-car-select">
+              <option value="">— Новый автомобиль —</option>
+              ${carStorage.map((c, i) => `<option value="${i}">${escapeHtml(c.car)} · ${escapeHtml(c.plate)}</option>`).join('')}
+            </select>
+          </div>
+          <div class="field-row">
+            <div class="field">
+              <label>Марка *</label>
+              <select id="brand-select" required name="brand">
+                <option value="" ${d.brand === '' ? 'selected' : ''}>Выберите марку</option>
+                ${BRANDS.map(b => `<option value="${b}" ${d.brand === b ? 'selected' : ''}>${b}</option>`).join('')}
+                <option value="other" ${isOther ? 'selected' : ''}>Другая</option>
+              </select>
+            </div>
+            <div class="field"><label>Модель *</label><input required name="model" value="${escapeHtml(d.model)}"></div>
+          </div>
+          <div class="field" id="brand-other-field" style="${isOther ? '' : 'display:none'}">
+            <label>Введите марку *</label>
+            <input id="brand-other-input" name="brandOther" value="${escapeHtml(d.brandOther)}" ${isOther ? 'required' : ''}>
+          </div>
+          <div class="field-row">
+            <div class="field"><label>Год выпуска</label><input type="number" name="year" min="1970" max="2026" placeholder="Например, 2020" value="${escapeHtml(String(d.year || ''))}"></div>
+            <div class="field"><label>Гос. номер</label><input name="plate" value="${escapeHtml(d.plate)}"></div>
+          </div>
+          <div class="field"><label>VIN</label><input name="vin" value="${escapeHtml(d.vin)}"></div>
+          <div class="field">
+            <label>Фото автомобиля</label>
+            <div class="photo-drop">Перетащите файлы сюда или нажмите, чтобы выбрать</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="form-actions">
+        <button type="button" class="btn btn-danger-ghost" data-action="reject-form">Отклонить</button>
+        <button type="button" class="btn btn-secondary" data-action="save-draft">Сохранить черновик</button>
+        <button type="button" class="btn btn-primary" data-action="send-to-service">Отправить в автосервис</button>
+      </div>
+    </form>
+  `;
+}
+
+/* ---------------- Render dispatcher ---------------- */
+
+function render() {
+  const content = document.getElementById('content');
+  let html = '';
+
+  switch (state.screen) {
+    case 'requests': html = screenRequests(); break;
+    case 'history': html = screenHistory(); break;
+    case 'drafts': html = screenDrafts(); break;
+    case 'notifications': html = screenNotifications(); break;
+    case 'profile': html = screenProfile(); break;
+    case 'create': html = screenCreateRequest(); break;
+  }
+
+  content.innerHTML = html;
+  wireCreateForm();
+
+  document.querySelectorAll('.nav-item').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.screen === state.screen);
+  });
+}
+
+function wireCreateForm() {
+  const brandSelect = document.getElementById('brand-select');
+  if (!brandSelect) return;
+  brandSelect.addEventListener('change', () => {
+    const otherField = document.getElementById('brand-other-field');
+    const otherInput = document.getElementById('brand-other-input');
+    const isOther = brandSelect.value === 'other';
+    otherField.style.display = isOther ? '' : 'none';
+    otherInput.required = isOther;
+    if (!isOther) otherInput.value = '';
+  });
+
+  const storageSelect = document.getElementById('storage-car-select');
+  if (storageSelect) {
+    storageSelect.addEventListener('change', () => {
+      if (storageSelect.value === '') return;
+      const c = carStorage[Number(storageSelect.value)];
+      if (!c) return;
+      const parsed = splitCarString(c.car);
+
+      brandSelect.value = BRANDS.includes(parsed.brand) ? parsed.brand : 'other';
+      brandSelect.dispatchEvent(new Event('change'));
+      if (brandSelect.value === 'other') {
+        document.getElementById('brand-other-input').value = parsed.brandOther || parsed.brand;
+      }
+      document.querySelector('#create-form [name="model"]').value = parsed.model;
+      document.querySelector('#create-form [name="plate"]').value = c.plate;
+      document.querySelector('#create-form [name="vin"]').value = c.vin;
+      toast('Данные автомобиля подставлены из Car Storage');
+    });
+  }
+}
+
+/* ---------------- Modal (read-only) ---------------- */
+
+function openViewModal(id) {
+  const r = findRequest(id);
+  if (!r) return;
+  const overlay = document.getElementById('modalOverlay');
+  const modal = document.getElementById('modal');
+  modal.innerHTML = `
+    <button class="modal-close" data-action="close-modal">✕</button>
+    <h3 style="margin-top:0">${r.id}</h3>
+    <div class="field"><label>Клиент</label><input value="${escapeHtml(r.client)}" disabled></div>
+    <div class="field-row">
+      <div class="field"><label>Телефон</label><input value="${escapeHtml(r.phone)}" disabled></div>
+      <div class="field"><label>Автомобиль</label><input value="${carLabel(r)}" disabled></div>
+    </div>
+    <div class="field"><label>Описание</label><textarea rows="3" disabled>${escapeHtml(r.issue)}</textarea></div>
+    ${r.storage ? `<div class="field"><label>Car Storage</label><input value="${escapeHtml(r.storage.location)} · ${r.storage.from} — ${r.storage.to}" disabled></div>` : ''}
+    <div class="field">
+      <label>Статус (меняет только автосервис)</label>
+      <input value="${STATUS_META[r.status].label}" disabled>
+    </div>
+    <div class="form-actions">
+      <button class="btn btn-secondary" data-action="close-modal">Закрыть</button>
+    </div>
+  `;
+  overlay.classList.add('open');
+}
+
+function closeModal() {
+  document.getElementById('modalOverlay').classList.remove('open');
+}
+
+/* ---------------- Event wiring ---------------- */
+
+document.querySelectorAll('.nav-item').forEach(btn => {
+  btn.addEventListener('click', () => {
+    state.screen = btn.dataset.screen;
+    state.editingDraftId = null;
+    render();
+  });
+});
+
+document.body.addEventListener('click', e => {
+  const action = e.target.closest('[data-action]');
+  if (!action) return;
+
+  switch (action.dataset.action) {
+    case 'open-create':
+      state.editingDraftId = null;
+      state.screen = 'create';
+      render();
+      break;
+
+    case 'edit-draft':
+      state.editingDraftId = action.dataset.id;
+      state.screen = 'create';
+      render();
+      break;
+
+    case 'reject-form':
+      state.editingDraftId = null;
+      state.screen = 'requests';
+      toast('Заявка отклонена, черновик не сохранён');
+      render();
+      break;
+
+    case 'save-draft': {
+      const data = collectFormData();
+      if (state.editingDraftId) {
+        const d = drafts.find(x => x.id === state.editingDraftId);
+        Object.assign(d, data);
+      } else {
+        drafts.push({ id: `DRAFT-${nextDraftNum++}`, ...data });
+      }
+      state.editingDraftId = null;
+      state.screen = 'drafts';
+      toast('Черновик сохранён');
+      render();
+      break;
+    }
+
+    case 'send-to-service': {
+      const form = document.getElementById('create-form');
+      if (!form.checkValidity()) {
+        form.reportValidity();
+        return;
+      }
+      const data = collectFormData();
+      requests.push({
+        id: `REQ-${nextReqNum++}`,
+        ...data,
+        status: 'todo',
+        created: new Date().toISOString().slice(0, 10),
+        storage: null,
+      });
+      if (state.editingDraftId) {
+        const idx = drafts.findIndex(x => x.id === state.editingDraftId);
+        if (idx >= 0) drafts.splice(idx, 1);
+      }
+      state.editingDraftId = null;
+      state.screen = 'requests';
+      toast('Заявка отправлена в автосервис');
+      render();
+      break;
+    }
+
+    case 'mark-read':
+      notifications.forEach(n => n.unread = false);
+      toast('Все уведомления отмечены как прочитанные');
+      render();
+      break;
+
+    case 'add-storage':
+      toast('Форма добавления авто на хранение (мокап)');
+      break;
+
+    case 'view-request':
+      openViewModal(action.dataset.id);
+      break;
+
+    case 'close-modal':
+      closeModal();
+      break;
+  }
+});
+
+document.getElementById('modalOverlay').addEventListener('click', e => {
+  if (e.target.id === 'modalOverlay') closeModal();
+});
+
+function collectFormData() {
+  const form = document.getElementById('create-form');
+  const fd = new FormData(form);
+  const brand = fd.get('brand') || '';
+  const brandOther = fd.get('brandOther')?.trim() || '';
+  const model = fd.get('model')?.trim() || '';
+  const brandLabel = brand === 'other' ? brandOther : brand;
+  return {
+    client: fd.get('client')?.trim() || '',
+    phone: fd.get('phone')?.trim() || '',
+    issue: fd.get('issue')?.trim() || '',
+    priority: fd.get('priority') || 'normal',
+    brand, brandOther, model,
+    year: fd.get('year') || '',
+    car: [brandLabel, model].filter(Boolean).join(' '),
+    plate: fd.get('plate')?.trim() || '',
+    vin: fd.get('vin')?.trim() || '',
+  };
+}
+
+render();
+</script>
+</body>
+</html>
